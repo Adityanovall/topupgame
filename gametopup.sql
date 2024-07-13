@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 10, 2024 at 05:23 PM
+-- Generation Time: Jul 13, 2024 at 08:40 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,6 +20,47 @@ SET time_zone = "+00:00";
 --
 -- Database: `gametopup`
 --
+
+DELIMITER $$
+--
+-- Procedures
+--
+CREATE DEFINER=`root`@`localhost` PROCEDURE `getTopUpHistory` (IN `userId` INT, IN `gameId` INT)   BEGIN
+    SELECT * FROM TopUps WHERE user_id = userId AND game_id = gameId;
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `getUserEmails` ()   BEGIN
+    SELECT email FROM Users;
+END$$
+
+--
+-- Functions
+--
+CREATE DEFINER=`root`@`localhost` FUNCTION `getTotalTopUp` (`userId` INT, `gameId` INT) RETURNS DECIMAL(10,2)  BEGIN
+    DECLARE total DECIMAL(10,2);
+    SELECT SUM(amount) INTO total FROM TopUps WHERE user_id = userId AND game_id = gameId;
+    RETURN total;
+END$$
+
+CREATE DEFINER=`root`@`localhost` FUNCTION `getTotalUsers` () RETURNS INT(11)  BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM Users;
+    RETURN total;
+END$$
+
+DELIMITER ;
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `activetopups`
+-- (See below for the actual view)
+--
+CREATE TABLE `activetopups` (
+`user_id` int(11)
+,`game_id` int(11)
+,`amount` decimal(10,2)
+);
 
 -- --------------------------------------------------------
 
@@ -114,6 +155,44 @@ INSERT INTO `paymentmethods` (`payment_method_id`, `method_name`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `topuplogs`
+--
+
+CREATE TABLE `topuplogs` (
+  `log_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `game_id` int(11) DEFAULT NULL,
+  `amount` decimal(10,2) DEFAULT NULL,
+  `action` varchar(10) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `topuplogs`
+--
+
+INSERT INTO `topuplogs` (`log_id`, `user_id`, `game_id`, `amount`, `action`) VALUES
+(1, 1, 1, 50000.00, 'INSERT'),
+(2, 1, 1, 20000.00, 'INSERT'),
+(3, 1, 1, 15000.00, 'UPDATE'),
+(4, 1, 1, 15000.00, 'UPDATE'),
+(5, 1, 1, 15000.00, 'UPDATE'),
+(6, 1, 1, 50000.00, 'INSERT'),
+(7, 1, 1, 30000.00, 'UPDATE'),
+(8, 1, 1, 30000.00, 'UPDATE'),
+(9, 1, 1, 30000.00, 'UPDATE'),
+(10, 1, 1, 30000.00, 'UPDATE'),
+(11, 1, 1, 30000.00, 'DELETE'),
+(12, 1, 1, 30000.00, 'DELETE'),
+(13, 1, 1, 30000.00, 'DELETE'),
+(14, 1, 1, 30000.00, 'DELETE'),
+(15, 1, 1, 30000.00, 'DELETE'),
+(16, 1, 1, 30000.00, 'DELETE'),
+(17, 1, 1, 30000.00, 'DELETE'),
+(18, 1, 1, 30000.00, 'DELETE');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `topups`
 --
 
@@ -131,11 +210,72 @@ CREATE TABLE `topups` (
 --
 
 INSERT INTO `topups` (`topup_id`, `user_id`, `game_id`, `payment_method_id`, `topup_date`, `amount`) VALUES
-(1, 1, 1, 1, '2024-01-10', 50000.00),
 (2, 2, 2, 2, '2024-02-15', 20000.00),
 (3, 3, 3, 3, '2024-03-05', 30000.00),
 (4, 4, 4, 4, '2024-04-20', 40000.00),
 (5, 5, 5, 5, '2024-05-25', 25000.00);
+
+--
+-- Triggers `topups`
+--
+DELIMITER $$
+CREATE TRIGGER `after_topup_delete` AFTER DELETE ON `topups` FOR EACH ROW BEGIN
+    INSERT INTO TopUpLogs (user_id, game_id, amount, action) 
+    VALUES (OLD.user_id, OLD.game_id, OLD.amount, 'DELETE');
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `after_topup_insert` AFTER INSERT ON `topups` FOR EACH ROW BEGIN
+    INSERT INTO TopUpLogs (user_id, game_id, amount, action) 
+    VALUES (NEW.user_id, NEW.game_id, NEW.amount, 'INSERT');
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `after_topup_update` AFTER UPDATE ON `topups` FOR EACH ROW BEGIN
+    INSERT INTO TopUpLogs (user_id, game_id, amount, action) 
+    VALUES (NEW.user_id, NEW.game_id, NEW.amount, 'UPDATE');
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `before_topup_delete` BEFORE DELETE ON `topups` FOR EACH ROW BEGIN
+    INSERT INTO TopUpLogs (user_id, game_id, amount, action) 
+    VALUES (OLD.user_id, OLD.game_id, OLD.amount, 'DELETE');
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `before_topup_insert` BEFORE INSERT ON `topups` FOR EACH ROW BEGIN
+    IF NEW.amount <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Top-up amount must be positive';
+    END IF;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `before_topup_update` BEFORE UPDATE ON `topups` FOR EACH ROW BEGIN
+    IF NEW.amount <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Top-up amount must be positive';
+    END IF;
+END
+$$
+DELIMITER ;
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `useremails`
+-- (See below for the actual view)
+--
+CREATE TABLE `useremails` (
+`first_name` varchar(50)
+,`last_name` varchar(50)
+,`email` varchar(100)
+);
 
 -- --------------------------------------------------------
 
@@ -160,6 +300,45 @@ INSERT INTO `users` (`user_id`, `first_name`, `last_name`, `email`) VALUES
 (3, 'Wardita', 'Winaya', 'wardita.winaya@gmail.com'),
 (4, 'Al', 'Najib', 'al.najib@gmail.com'),
 (5, 'Rival', 'Rasyid', 'rivalrasyid@gmail.com');
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `usertopups`
+-- (See below for the actual view)
+--
+CREATE TABLE `usertopups` (
+`user_id` int(11)
+,`game_id` int(11)
+,`amount` decimal(10,2)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `activetopups`
+--
+DROP TABLE IF EXISTS `activetopups`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `activetopups`  AS SELECT `usertopups`.`user_id` AS `user_id`, `usertopups`.`game_id` AS `game_id`, `usertopups`.`amount` AS `amount` FROM `usertopups` WHERE `usertopups`.`amount` > 10WITH CASCADEDCHECK OPTION  ;
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `useremails`
+--
+DROP TABLE IF EXISTS `useremails`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `useremails`  AS SELECT `users`.`first_name` AS `first_name`, `users`.`last_name` AS `last_name`, `users`.`email` AS `email` FROM `users` ;
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `usertopups`
+--
+DROP TABLE IF EXISTS `usertopups`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `usertopups`  AS SELECT `topups`.`user_id` AS `user_id`, `topups`.`game_id` AS `game_id`, `topups`.`amount` AS `amount` FROM `topups` ;
 
 --
 -- Indexes for dumped tables
@@ -191,13 +370,21 @@ ALTER TABLE `paymentmethods`
   ADD PRIMARY KEY (`payment_method_id`);
 
 --
+-- Indexes for table `topuplogs`
+--
+ALTER TABLE `topuplogs`
+  ADD PRIMARY KEY (`log_id`),
+  ADD KEY `user_id` (`user_id`,`game_id`);
+
+--
 -- Indexes for table `topups`
 --
 ALTER TABLE `topups`
   ADD PRIMARY KEY (`topup_id`),
-  ADD KEY `user_id` (`user_id`),
   ADD KEY `game_id` (`game_id`),
-  ADD KEY `payment_method_id` (`payment_method_id`);
+  ADD KEY `payment_method_id` (`payment_method_id`),
+  ADD KEY `idx_user_game` (`user_id`,`game_id`),
+  ADD KEY `idx_date_amount` (`topup_date`,`amount`);
 
 --
 -- Indexes for table `users`
@@ -228,10 +415,16 @@ ALTER TABLE `paymentmethods`
   MODIFY `payment_method_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
+-- AUTO_INCREMENT for table `topuplogs`
+--
+ALTER TABLE `topuplogs`
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+
+--
 -- AUTO_INCREMENT for table `topups`
 --
 ALTER TABLE `topups`
-  MODIFY `topup_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `topup_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `users`
